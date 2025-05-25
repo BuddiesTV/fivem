@@ -1,0 +1,18 @@
+﻿namespace CitizenFX.Wrapper.Core.Tasks;
+
+public class TickSynchronizationContext(TickTaskScheduler scheduler) : SynchronizationContext
+{
+	public override void Post(SendOrPostCallback callback, object? state)
+	{
+		Task.Factory.StartNew(
+			() => callback(state),
+			CancellationToken.None,
+			TaskCreationOptions.None,
+			scheduler);
+	}
+	
+	public override void Send(SendOrPostCallback callback, object? state)
+	{
+		Post(callback, state);
+	}
+}

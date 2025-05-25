@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<OutputPath>C:\Users\Lucas\Documents\Projects\fivem\code\bin\server\windows\debug\citizen\dotnet</OutputPath>
+		<BaseOutputPath>C:\Users\Lucas\Documents\Projects\fivem\code\bin\server\windows\debug\citizen\dotnet</BaseOutputPath>
+		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+		<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\CitizenFX.Shared\CitizenFX.Shared.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="MessagePack" Version="3.1.3" />
+    </ItemGroup>
+
+</Project>

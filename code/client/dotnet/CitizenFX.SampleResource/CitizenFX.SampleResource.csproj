@@ -1,0 +1,18 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net9.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<OutputPath>C:\Users\Lucas\Documents\Projects\fivem\code\bin\server\windows\txData\FiveMBasicServerCFXDefault_32B74C.base\resources\test</OutputPath>
+		<BaseOutputPath>C:\Users\Lucas\Documents\Projects\fivem\code\bin\server\windows\txData\FiveMBasicServerCFXDefault_32B74C.base\resources\test</BaseOutputPath>
+		<CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+		<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+		<AssemblyName>test.dotnet</AssemblyName>
+	</PropertyGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\CitizenFX.Wrapper\CitizenFX.Wrapper.csproj" />
+	</ItemGroup>
+
+</Project>

@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFramework>net9.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<AssemblyName>CitizenFX.Host.Server</AssemblyName>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<OutputPath>C:\Users\Lucas\Documents\Projects\fivem\code\bin\server\windows\debug\citizen\dotnet</OutputPath>
+		<BaseOutputPath>C:\Users\Lucas\Documents\Projects\fivem\code\bin\server\windows\debug\citizen\dotnet</BaseOutputPath>
+		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+		<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+	</PropertyGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\CitizenFX.Shared\CitizenFX.Shared.csproj" />
+	</ItemGroup>
+
+</Project>
