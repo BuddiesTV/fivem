@@ -9,31 +9,31 @@ internal static class Host
 
 	private static void Main()
 	{
-		_resourceService = new();
+		_resourceService = new ResourceService();
 	}
 
 	[UnmanagedCallersOnly]
 	private static void RegisterResourceCallback(IntPtr resourceNamePtr, IntPtr runtime)
 	{
-		string resourceName = Marshal.PtrToStringUTF8(resourceNamePtr)!;
-		
+		var resourceName = Marshal.PtrToStringUTF8(resourceNamePtr)!;
+
 		_resourceService.RegisterResource(resourceName, runtime);
 	}
 
 	[UnmanagedCallersOnly]
 	private static void ShutdownResourceCallback(IntPtr resourceNamePtr)
 	{
-		string resourceName = Marshal.PtrToStringUTF8(resourceNamePtr)!;
-		
+		var resourceName = Marshal.PtrToStringUTF8(resourceNamePtr)!;
+
 		_resourceService.ShutdownResource(resourceName);
 	}
 
 	[UnmanagedCallersOnly]
 	private static void LoadResourceFileCallback(IntPtr resourceNamePtr, IntPtr fileNamePtr)
 	{
-		string resourceName = Marshal.PtrToStringUTF8(resourceNamePtr)!;
-		string fileName = Marshal.PtrToStringUTF8(fileNamePtr)!;
-		
+		var resourceName = Marshal.PtrToStringUTF8(resourceNamePtr)!;
+		var fileName = Marshal.PtrToStringUTF8(fileNamePtr)!;
+
 		_resourceService.LoadResourceFile(resourceName, fileName);
 	}
 }

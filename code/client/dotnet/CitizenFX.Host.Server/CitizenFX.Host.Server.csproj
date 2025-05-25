@@ -14,7 +14,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-	  <ProjectReference Include="..\CitizenFX.Shared\CitizenFX.Shared.csproj" />
+		<ProjectReference Include="..\CitizenFX.Shared\CitizenFX.Shared.csproj"/>
 	</ItemGroup>
 
 </Project>

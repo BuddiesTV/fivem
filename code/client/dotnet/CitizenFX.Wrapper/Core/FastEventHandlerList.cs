@@ -6,10 +6,10 @@ internal class FastEventHandlerList
 {
 	private volatile Delegate[] _handlers = new Delegate[4];
 	private volatile int _count;
-	private readonly Lock _lock = new Lock();
-	
+	private readonly Lock _lock = new();
+
 	public int Count => _count;
-	
+
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public void AddHandler(Delegate handler)
 	{
@@ -23,7 +23,7 @@ internal class FastEventHandlerList
 			}
 
 			_handlers[_count] = handler;
-			
+
 			Interlocked.Increment(ref _count);
 		}
 	}
@@ -32,31 +32,27 @@ internal class FastEventHandlerList
 	{
 		lock (_lock)
 		{
-			for (int i = 0; i < _count; i++)
-			{
+			for (var i = 0; i < _count; i++)
 				if (ReferenceEquals(_handlers[i], handler))
 				{
-					for (int j = i; j < _count - 1; j++)
-					{
-						_handlers[j] = _handlers[j + 1];
-					}
+					for (var j = i; j < _count - 1; j++) _handlers[j] = _handlers[j + 1];
 					_handlers[_count - 1] = null!;
-					
+
 					Interlocked.Decrement(ref _count);
 					return true;
 				}
-			}
 		}
+
 		return false;
 	}
-	
+
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public void TriggerHandlers(object[] args)
 	{
 		var handlers = _handlers;
 		var count = _count;
 
-		for (int i = 0; i < count; i++)
+		for (var i = 0; i < count; i++)
 		{
 			var handler = handlers[i];
 			handler.DynamicInvoke(args);

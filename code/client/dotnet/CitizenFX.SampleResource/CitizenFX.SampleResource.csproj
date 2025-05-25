@@ -12,7 +12,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-	  <ProjectReference Include="..\CitizenFX.Wrapper\CitizenFX.Wrapper.csproj" />
+		<ProjectReference Include="..\CitizenFX.Wrapper\CitizenFX.Wrapper.csproj"/>
 	</ItemGroup>
 
 </Project>

@@ -4,9 +4,9 @@ namespace CitizenFX.Wrapper.Core.Tasks;
 
 public class TickTaskScheduler : TaskScheduler
 {
-	private readonly ConcurrentQueue<Task> _tasks = new ConcurrentQueue<Task>();
+	private readonly ConcurrentQueue<Task> _tasks = new();
 	private readonly int _mainThreadId = Thread.CurrentThread.ManagedThreadId;
-	
+
 	protected override void QueueTask(Task task)
 	{
 		_tasks.Enqueue(task);
@@ -19,17 +19,14 @@ public class TickTaskScheduler : TaskScheduler
 
 		return TryExecuteTask(task);
 	}
-	
+
 	protected override IEnumerable<Task> GetScheduledTasks()
 	{
 		return _tasks.ToArray();
 	}
-	
+
 	public void ExecutePendingTasks()
 	{
-		while (_tasks.TryDequeue(out Task? task))
-		{
-			TryExecuteTask(task);
-		}
+		while (_tasks.TryDequeue(out var task)) TryExecuteTask(task);
 	}
 }

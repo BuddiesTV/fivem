@@ -10,7 +10,7 @@ public class TickSynchronizationContext(TickTaskScheduler scheduler) : Synchroni
 			TaskCreationOptions.None,
 			scheduler);
 	}
-	
+
 	public override void Send(SendOrPostCallback callback, object? state)
 	{
 		Post(callback, state);

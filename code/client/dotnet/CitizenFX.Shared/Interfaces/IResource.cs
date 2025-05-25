@@ -10,6 +10,6 @@ public interface IResource
 	public AssemblyLoadContext? AssemblyLoadContext { get; set; }
 	public Assembly? WrapperAssembly { get; set; }
 	public CitizenResource? CitizenResource { get; set; }
-	
+
 	void LoadAssembly(Assembly wrapperAssembly, string assemblyName);
 }
