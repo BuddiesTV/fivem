@@ -1,6 +1,5 @@
 ﻿using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
-using CitizenFX.Shared;
 using CitizenFX.Shared.Core;
 using CitizenFX.Shared.Interfaces;
 using MessagePack;
@@ -9,6 +8,7 @@ namespace CitizenFX.Wrapper.Core;
 
 public static class Citizen
 {
+	// ToDo: Check this out, somehow ConcurrentDictionary has a very high performance-overhead for first TryGetValue
 	private static readonly ConcurrentDictionary<string, FastEventHandlerList> EventHandlers = new();
 
 	public static IResource Resource = null!;
@@ -20,7 +20,7 @@ public static class Citizen
 
 	public static void InvokeFunctionReference(string functionReference, object[] args)
 	{
-		var argsSerialized = MessagePackSerializer.Serialize<object[]>(args);
+		var argsSerialized = MessagePackSerializer.Serialize(args);
 
 		Library.InvokeFunctionReference(Resource.Runtime, functionReference, argsSerialized);
 	}
@@ -39,54 +39,8 @@ public static class Citizen
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public static void RegisterEvent<T1>(string eventName, Action<T1> handler)
-	{
-		Library.InvokeNative(0xD233A168, eventName);
-
-		GetOrCreateHandlerList(eventName).AddHandler(handler);
-	}
-
-	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public static void RegisterEvent<T1, T2>(string eventName, Action<T1, T2> handler)
-	{
-		Library.InvokeNative(0xD233A168, eventName);
-
-		GetOrCreateHandlerList(eventName).AddHandler(handler);
-	}
-
-	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public static void RegisterEvent<T1, T2, T3>(string eventName, Action<T1, T2, T3> handler)
-	{
-		Library.InvokeNative(0xD233A168, eventName);
-
-		GetOrCreateHandlerList(eventName).AddHandler(handler);
-	}
-
-	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public static void RegisterEvent<T1, T2, T3, T4>(string eventName, Action<T1, T2, T3, T4> handler)
-	{
-		Library.InvokeNative(0xD233A168, eventName);
-
-		GetOrCreateHandlerList(eventName).AddHandler(handler);
-	}
-
-	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public static void RegisterEvent<T1, T2, T3, T4, T5>(string eventName, Action<T1, T2, T3, T4, T5> handler)
-	{
-		Library.InvokeNative(0xD233A168, eventName);
-
-		GetOrCreateHandlerList(eventName).AddHandler(handler);
-	}
-
-	public static bool UnregisterEvent(string eventName, Delegate handler)
-	{
-		if (EventHandlers.TryGetValue(eventName, out var handlerList)) return handlerList.RemoveHandler(handler);
-		return false;
-	}
-
-	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	private static FastEventHandlerList GetOrCreateHandlerList(string eventName)
 	{
-		return EventHandlers.GetOrAdd(eventName, static _ => new FastEventHandlerList());
+		return EventHandlers.GetOrAdd(eventName, _ => new FastEventHandlerList());
 	}
 }
