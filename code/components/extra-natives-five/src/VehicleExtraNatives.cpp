@@ -36,6 +36,8 @@
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Gaming.Input.h>
 
+#include <GamePrimitives.h>
+
 #include "DeferredInitializer.h"
 #include "EntitySystem.h"
 #include "GameValueStub.h"
@@ -51,6 +53,26 @@ static hook::cdecl_stub<void(void*, int, float, float, float, bool, bool)> break
 static hook::cdecl_stub<bool(void*, int)> getWheelBroken([]
 {
 	return hook::get_call(hook::get_pattern("E8 ? ? ? ? 48 8B CD 41 88 84 1F"));
+});
+
+static hook::cdecl_stub<void(void*)> rebuildVehicleFragment([]
+{
+	return hook::get_pattern("48 8B C4 48 89 58 ? 48 89 70 ? 48 89 78 ? 4C 89 70 ? 55 48 8B EC 48 83 EC ? 48 8B 81 ? ? ? ? 48 8B F9");
+});
+
+static hook::cdecl_stub<void(void*)> resetWheelDamage([]
+{
+	return hook::get_pattern("45 33 C0 B8 ? ? ? ? 89 81");
+});
+
+static hook::cdecl_stub<bool(void*, int)> isFragmentChildBroken([]
+{
+	return hook::get_pattern("4C 8B 59 ? 45 33 D2 4D 85 DB");
+});
+
+static hook::cdecl_stub<void(void*, int)> breakFragmentChild([]
+{
+	return hook::get_call(hook::get_pattern("8B D6 48 8B CB E8 ? ? ? ? 48 8D 0D ? ? ? ? 44 8B C6", 5));
 });
 
 static hook::cdecl_stub<void(void*, bool)> switchEngineOff([]
@@ -327,6 +349,26 @@ static char* VehicleTopSpeedModifierPtr;
 static int VehicleCheatPowerIncreaseOffset;
 
 static int VehicleDamageStructOffset;
+
+static int WheelBrokenMaskOffset;
+static int VehiclePartBrokenFlagOffset;
+static int VehicleBoundFlagsMethodVtableOffset;
+static int PhysicalSetVelocityVtableOffset;
+static int PhysicalSetAngVelocityVtableOffset;
+static int FragInstOffset;
+static int WheelFragChildOffset;
+static int FragInstDrawableOffset;
+static int FragDrawableTypesOffset;
+static int FragInstLodOffset;
+static int FragTypeChildCountOffset;
+
+static void* (*g_getFragTypeForLod)(void* types, uint32_t lod);
+
+constexpr int MaxFragChildren = 256;
+
+constexpr int VehiclePartBrokenFlag = 2;
+
+constexpr float MaxRestoredSpeedSquared = 6400.0f;
 
 static bool* g_trainsForceDoorsOpen;
 static int TrainDoorCountOffset;
@@ -610,6 +652,112 @@ uintptr_t CTaskVehicleReactToCopSiren_ctor(void* thisPtr, uint32_t reaction, uin
 	return g_origCTaskVehicleReactToCopSiren_ctor(thisPtr, reaction, time);
 }
 
+static int GetFragChildCount(void* inst)
+{
+	auto drawable = *(char**)((char*)inst + FragInstDrawableOffset);
+	auto types = *(char**)(drawable + FragDrawableTypesOffset);
+
+	if (!types)
+	{
+		return 0;
+	}
+
+	auto lod = *(uint32_t*)((char*)inst + FragInstLodOffset);
+	auto type = (char*)g_getFragTypeForLod(types, lod);
+
+	return *(uint8_t*)(type + FragTypeChildCountOffset);
+}
+
+static rage::Vec4V GetVehicleVelocity(fwEntity* vehicle, int vtableOffset)
+{
+	return *(*(rage::Vec4V*(__fastcall**)(fwEntity*))(*(uint64_t*)vehicle + vtableOffset))(vehicle);
+}
+
+static void SetVehicleVelocity(fwEntity* vehicle, int vtableOffset, rage::Vec4V value)
+{
+	if (((value.x * value.x) + (value.y * value.y) + (value.z * value.z)) > MaxRestoredSpeedSquared)
+	{
+		value.x = 0.0f;
+		value.y = 0.0f;
+		value.z = 0.0f;
+	}
+
+	(*(void(__fastcall**)(fwEntity*, const rage::Vec4V*))(*(uint64_t*)vehicle + vtableOffset))(vehicle, &value);
+}
+
+static void FixVehicleWheel(fwEntity* vehicle, uint32_t wheelIndex, uintptr_t wheelAddr)
+{
+	auto damageStruct = (void*)((char*)vehicle + VehicleDamageStructOffset);
+	auto brokenMask = (uint32_t*)((char*)vehicle + WheelBrokenMaskOffset);
+	auto wasBroken = *brokenMask;
+	auto numWheels = readValue<unsigned char>(vehicle, NumWheelsOffset);
+
+	if (wasBroken & (1 << wheelIndex))
+	{
+		// the getter is the slot after the setter
+		auto velocity = GetVehicleVelocity(vehicle, PhysicalSetVelocityVtableOffset + 8);
+		auto angularVelocity = GetVehicleVelocity(vehicle, PhysicalSetAngVelocityVtableOffset + 8);
+
+		auto inst = *(void**)((char*)vehicle + FragInstOffset);
+		auto children = GetFragChildCount(inst);
+		auto wheelsAddress = readValue<uint64_t>(vehicle, WheelsPtrOffset);
+
+		// rebuilding the fragment seems to be the only way to put a child/wheel back, and you can only rebuild the entire fragment, so we need to note
+		// which ones were off before
+		bool wasOff[MaxFragChildren] = {};
+		bool isAWheel[MaxFragChildren] = {};
+
+		for (int child = 0; child < children; child++)
+		{
+			wasOff[child] = isFragmentChildBroken(inst, child);
+		}
+
+		for (uint32_t i = 0; i < numWheels; i++)
+		{
+			auto addr = *reinterpret_cast<uint64_t*>(wheelsAddress + 0x008 * i);
+
+			// -1 when the wheel is not a child of its own
+			int child = *(int8_t*)(addr + WheelFragChildOffset);
+
+			if (child >= 0 && child < children)
+			{
+				isAWheel[child] = true;
+			}
+		}
+
+		rebuildVehicleFragment(damageStruct);
+
+		*(uint8_t*)((char*)vehicle + VehiclePartBrokenFlagOffset) &= ~VehiclePartBrokenFlag;
+		*brokenMask = 0;
+
+		SetVehicleVelocity(vehicle, PhysicalSetVelocityVtableOffset, velocity);
+		SetVehicleVelocity(vehicle, PhysicalSetAngVelocityVtableOffset, angularVelocity);
+
+		// break each fragment child that was off before, ignoring wheels
+		for (int child = 0; child < children; child++)
+		{
+			if (wasOff[child] && !isAWheel[child])
+			{
+				breakFragmentChild(inst, child);
+			}
+		}
+
+		// the rebuilt bound only has the archetypes collision flags, write the vehicles own back
+		(*(void(__fastcall**)(fwEntity*))(*(uint64_t*)vehicle + VehicleBoundFlagsMethodVtableOffset))(vehicle);
+	}
+
+	resetWheelDamage((void*)wheelAddr);
+
+	for (uint32_t i = 0; i < numWheels; i++)
+	{
+		if (i != wheelIndex && (wasBroken & (1 << i)))
+		{
+			// delete wheels that were off before the rebuild/reset
+			breakOffVehicleWheel(damageStruct, i, 0.0f, 1.0f, 0.0f, false, false);
+		}
+	}
+}
+
 static HookFunction initFunction([]()
 {
 	{
@@ -804,6 +952,49 @@ static HookFunction initFunction([]()
 	{
 		auto location = hook::get_pattern<char>("F3 44 0F 11 4C 24 ? E8 ? ? ? ? EB 7A");
 		VehicleDamageStructOffset = *(uint32_t*)(location - 11);
+	}
+
+	{
+		auto location = hook::get_call(hook::get_pattern<char>("E8 ? ? ? ? 48 8B CD 41 88 84 1F"));
+		WheelBrokenMaskOffset = *(uint32_t*)(location + 2);
+	}
+
+	{
+		auto location = hook::get_pattern<char>("48 8B 87 ? ? ? ? 80 A0 ? ? ? ? ? F3 0F 10 55");
+		VehiclePartBrokenFlagOffset = *(uint32_t*)(location + 9);
+	}
+
+	{
+		// both passes are the same code, and the only difference is the vtable slot which gets wildcarded, so we need to run each pattern past
+		// the call to make it unique
+		PhysicalSetVelocityVtableOffset = *hook::get_pattern<uint32_t>("0F 2F 15 ? ? ? ? 76 ? 44 21 7D ? 44 21 7D ? 44 21 7D ? 48 8B 8F ? ? ? ? 48 8D 55 ? 48 8B 01 FF 90 ? ? ? ? F3 0F 10 55", 37);
+		PhysicalSetAngVelocityVtableOffset = *hook::get_pattern<uint32_t>("0F 2F 15 ? ? ? ? 76 ? 44 21 7D ? 44 21 7D ? 44 21 7D ? 48 8B 8F ? ? ? ? 48 8D 55 ? 48 8B 01 FF 90 ? ? ? ? 48 85 DB", 37);
+	}
+
+	{
+		auto location = hook::get_pattern<char>("48 0F BE 9D");
+		WheelFragChildOffset = *(uint32_t*)(location + 4);
+	}
+
+	{
+		auto location = hook::get_pattern<char>("48 8B B9 ? ? ? ? E8 ? ? ? ? 84 C0");
+		FragInstOffset = *(uint32_t*)(location + 3);
+	}
+
+	{
+		auto location = hook::get_pattern<char>("48 8B 47 ? 48 8B 88 ? ? ? ? 48 85 C9 74 ? 8B 97 ? ? ? ? E8 ? ? ? ? EB ? 33 C0 0F B6 80 ? ? ? ? 44 3B F8");
+
+		FragInstDrawableOffset = *(uint8_t*)(location + 3);
+		FragDrawableTypesOffset = *(uint32_t*)(location + 7);
+		FragInstLodOffset = *(uint32_t*)(location + 18);
+		FragTypeChildCountOffset = *(uint32_t*)(location + 34);
+
+		hook::set_call(&g_getFragTypeForLod, location + 22);
+	}
+
+	{
+		auto location = hook::get_pattern<char>("E8 ? ? ? ? 84 C0 75 ? 33 D2 48 8B CF E8 ? ? ? ? 48 8B 07");
+		VehicleBoundFlagsMethodVtableOffset = *(uint32_t*)(location + 27);
 	}
 
 	{
@@ -2004,6 +2195,25 @@ static HookFunction initFunction([]()
 			}
 
 			context.SetResult<bool>(getWheelBroken(vehicle, wheelIndex));
+		}
+	});
+
+	fx::ScriptEngine::RegisterNativeHandler("FIX_VEHICLE_WHEEL", [](fx::ScriptContext& context)
+	{
+		if (fwEntity* vehicle = getAndCheckVehicle(context, "FIX_VEHICLE_WHEEL"))
+		{
+			auto wheelIndex = context.GetArgument<uint32_t>(1);
+			auto numWheels = readValue<unsigned char>(vehicle, NumWheelsOffset);
+
+			if (wheelIndex >= numWheels)
+			{
+				return;
+			}
+
+			auto wheelsAddress = readValue<uint64_t>(vehicle, WheelsPtrOffset);
+			auto wheelAddr = *reinterpret_cast<uint64_t*>(wheelsAddress + 0x008 * wheelIndex);
+
+			FixVehicleWheel(vehicle, wheelIndex, wheelAddr);
 		}
 	});
 
